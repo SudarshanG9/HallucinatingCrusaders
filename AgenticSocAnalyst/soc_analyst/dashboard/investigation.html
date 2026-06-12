@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block title %}Investigation #{{ alert.id[:8] }} - Agentic SOC Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .investigation-grid {
+        display: grid;
+        grid-template-columns: 350px 1fr;
+        gap: 2rem;
+    }
+
+    .pipeline-timeline {
+        position: relative;
+        padding-left: 2rem;
+        margin: 1.5rem 0;
+    }
+
+    .pipeline-timeline::before {
+        content: '';
+        position: absolute;
+        left: 7px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: var(--border-ghost);
+    }
+
+    .timeline-step {
+        position: relative;
+        margin-bottom: 2rem;
+    }
+
+    .timeline-step::before {
+        content: '';
+        position: absolute;
+        left: -29px;
+        top: 4px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background-color: var(--bg-dark);
+        border: 2px solid var(--text-muted);
+        transition: var(--transition-smooth);
+    }
+
+    .timeline-step.complete::before {
+        background-color: var(--color-cyan);
+        border-color: var(--color-cyan);
+        box-shadow: 0 0 10px var(--color-cyan);
+    }
+
+    .timeline-step.active::before {
+        background-color: var(--color-purple);
+        border-color: var(--color-purple);
+        box-shadow: 0 0 10px var(--color-purple);
+    }
+
+    .step-title {
+        font-family: var(--font-headline);
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: var(--text-white);
+        margin-bottom: 0.25rem;
+    }
+
+    .step-desc {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    /* Tab Controls */
+    .tabs-nav {
+        display: flex;
+        border-bottom: 1px solid var(--border-ghost);
+        margin-bottom: 1.5rem;
+        gap: 1rem;
+    }
+
+    .tab-button {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        font-family: var(--font-headline);
+        font-weight: 500;
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        transition: var(--transition-smooth);
+        border-bottom: 2px solid transparent;
+    }
+
+    .tab-button:hover {
+        color: var(--text-white);
+    }
+
+    .tab-button.active {
+        color: var(--color-cyan);
+        border-bottom-color: var(--color-cyan);
+        font-weight: 600;
+    }
+
+    .tab-pane {
+        display: none;
+    }
+
+    .tab-pane.active {
+        display: block;
+    }
+
+    /* Code & JSON displays */
+    .code-block {
+        background-color: rgba(9, 14, 28, 0.6);
+        border: 1px solid var(--border-ghost);
+        border-radius: 8px;
+        padding: 1rem;
+        font-family: monospace;
+        font-size: 0.8rem;
+        color: #a9c7ff;
+        overflow-x: auto;
+        max-height: 400px;
+    }
+
+    /* Evidence Card layout */
+    .evidence-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .evidence-stat {
+        background: rgba(255,255,255,0.02);
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid var(--border-ghost);
+    }
+
+    .evidence-stat-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        margin-bottom: 0.25rem;
+    }
+
+    .evidence-stat-value {
+        font-family: var(--font-headline);
+        font-size: 1.25rem;
+        color: var(--text-white);
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Markdown Renderer -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<div class="dashboard-header">
+    <div class="header-title">
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
+            <a href="/dashboard/alerts" class="btn-ghost" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
+                <i class="fa-solid fa-arrow-left"></i> Back
+            </a>
+            <span class="neon-badge neon-badge-cyan">ALERT ID: #{{ alert.id[:12] }}</span>
+        </div>
+        <h1>Investigation Details</h1>
+    </div>
+    <div class="header-actions">
+        {% if not investigation %}
+            <button class="btn-neon" 
+                    hx-post="/api/v1/analysis/analyze/{{ alert.id }}"
+                    hx-swap="none"
+                    hx-on::after-request="window.location.reload()"
+                    hx-indicator="#loading-spinner">
+                <i class="fa-solid fa-brain" id="loading-spinner"></i> Trigger Analysis Pipeline
+            </button>
+        {% else %}
+            <span class="neon-badge neon-badge-purple" style="font-weight: bold;">
+                <i class="fa-solid fa-file-shield mr-1"></i> Triage Report Compiled
+            </span>
+        {% endif %}
+    </div>
+</div>
+
+<div class="investigation-grid">
+    <!-- Left Column: Summary + Pipeline Timeline -->
+    <div>
+        <div class="glass-card">
+            <h3 class="display-font text-glow-cyan" style="margin-bottom: 1rem;">Alert Scope</h3>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">
+                <div>
+                    <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">Rule Description</div>
+                    <div style="font-weight: 600; color: #fff;">{{ alert.rule_description }}</div>
+                </div>
+                <div>
+                    <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">Severity Assessment</div>
+                    <span class="severity-badge sev-{{ alert.severity.value }}" style="display: inline-block; margin-top: 0.25rem;">
+                        {{ alert.severity.name }}
+                    </span>
+                </div>
+                <div>
+                    <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">Source Telemetry</div>
+                    <span class="neon-badge neon-badge-purple" style="display: inline-block; margin-top: 0.25rem;">{{ alert.vendor }}</span>
+                </div>
+                {% if alert.src_ip %}
+                <div>
+                    <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">Source IP Address</div>
+                    <div style="font-family: monospace; color: var(--color-cyan);">{{ alert.src_ip }}</div>
+                </div>
+                {% endif %}
+                {% if alert.username %}
+                <div>
+                    <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">Target Identity</div>
+                    <div style="color: var(--color-purple);">{{ alert.username }}</div>
+                </div>
+                {% endif %}
+                {% if alert.hostname %}
+                <div>
+                    <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">Asset Name</div>
+                    <div>{{ alert.hostname }}</div>
+                </div>
+                {% endif %}
+                <div>
+                    <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">Telemetry Timestamp</div>
+                    <div>{{ alert.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card">
+            <h3 class="display-font text-glow-purple" style="margin-bottom: 1rem;">Pipeline Pipeline</h3>
+            <div class="pipeline-timeline">
+                <div class="timeline-step {% if investigation or alert.investigation_status.value != 'new' %}complete{% else %}active{% endif %}">
+                    <div class="step-title">Stage 1: Gate Scan</div>
+                    <div class="step-desc">Regex + Heuristic check for prompt/instruction injections.</div>
+                </div>
+                <div class="timeline-step {% if investigation %}complete{% elif alert.investigation_status.value == 'investigating' %}active{% endif %}">
+                    <div class="step-title">Stage 2: Parallel Triage</div>
+                    <div class="step-desc">Endpoint, Network, Threat Intel and Correlation tool collection.</div>
+                </div>
+                <div class="timeline-step {% if investigation and investigation.status == 'closed' %}complete{% elif investigation %}active{% endif %}">
+                    <div class="step-title">Stage 3: Decision Engine</div>
+                    <div class="step-desc">Privileged LLM incident summary and recommended HITL actions.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Parallel Evidence & Final Report tabs -->
+    <div>
+        <div class="tabs-nav">
+            <button class="tab-button active" onclick="switchTab(event, 'report-pane')">
+                <i class="fa-solid fa-file-invoice mr-1"></i> Triage Report
+            </button>
+            <button class="tab-button" onclick="switchTab(event, 'evidence-pane')">
+                <i class="fa-solid fa-magnifying-glass-location mr-1"></i> Enriched Evidence
+            </button>
+            <button class="tab-button" onclick="switchTab(event, 'raw-pane')">
+                <i class="fa-solid fa-code mr-1"></i> Raw Log
+            </button>
+        </div>
+
+        <!-- Triage Report Tab -->
+        <div id="report-pane" class="tab-pane active">
+            {% if investigation %}
+                <div class="evidence-summary">
+                    <div class="evidence-stat">
+                        <div class="evidence-stat-label">Verdict Class</div>
+                        <div class="evidence-stat-value" style="color: {% if investigation.classification == 'confirmed_threat' %}var(--color-critical){% else %}var(--color-cyan){% endif %};">
+                            {{ investigation.classification.replace('_', ' ').upper() }}
+                        </div>
+                    </div>
+                    <div class="evidence-stat">
+                        <div class="evidence-stat-label">Attack Vector</div>
+                        <div class="evidence-stat-value">{{ investigation.attack_type.replace('_', ' ').title() }}</div>
+                    </div>
+                    <div class="evidence-stat">
+                        <div class="evidence-stat-label">MITRE Tactics</div>
+                        <div class="evidence-stat-value" style="font-size: 0.95rem;">
+                            {{ investigation.mitre_tactics | join(', ') if investigation.mitre_tactics else 'None' }}
+                        </div>
+                    </div>
+                </div>
+
+                <div id="markdown-report" style="display:none;">{{ investigation.report_markdown }}</div>
+                <div id="rendered-report" class="glass-card" style="padding: 2rem; background: rgba(9, 14, 28, 0.4); line-height: 1.6;"></div>
+                
+                <script>
+                    document.getElementById('rendered-report').innerHTML = marked.parse(document.getElementById('markdown-report').innerText);
+                </script>
+            {% else %}
+                <div class="glass-card" style="text-align: center; padding: 4rem 2rem;">
+                    <i class="fa-solid fa-brain" style="font-size: 3.5rem; color: rgba(255,255,255,0.05); margin-bottom: 1.5rem; display: block;"></i>
+                    <h3>Triage Report Awaiting Compilation</h3>
+                    <p style="color: var(--text-muted); margin-top: 0.5rem; margin-bottom: 2rem; max-width: 500px; margin-left: auto; margin-right: auto;">
+                        This alert has not been processed by the Dual-LLM workflow yet. Trigger the analysis manually using the button in the top right.
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Enriched Evidence Tab -->
+        <div id="evidence-pane" class="tab-pane">
+            {% if investigation %}
+                <div class="glass-card">
+                    <h3 class="display-font text-glow-cyan" style="margin-bottom: 1rem;"><i class="fa-solid fa-shield-virus mr-2"></i> Threat Intelligence Indicators</h3>
+                    <pre class="code-block">{{ investigation.threat_intel_results | tojson(indent=2) }}</pre>
+                </div>
+                
+                <div class="glass-card">
+                    <h3 class="display-font text-glow-purple" style="margin-bottom: 1rem;"><i class="fa-solid fa-network-wired mr-2"></i> Network Intelligence Lookups</h3>
+                    <pre class="code-block">{{ investigation.network_intel_results | tojson(indent=2) }}</pre>
+                </div>
+
+                <div class="glass-card">
+                    <h3 class="display-font text-glow-cyan" style="margin-bottom: 1rem;"><i class="fa-solid fa-server mr-2"></i> Host / Process Dumps</h3>
+                    <pre class="code-block">{{ investigation.endpoint_intel_results | tojson(indent=2) }}</pre>
+                </div>
+            {% else %}
+                <div class="glass-card" style="text-align: center; padding: 4rem 2rem;">
+                    <i class="fa-solid fa-box-open" style="font-size: 3rem; color: rgba(255,255,255,0.05); margin-bottom: 1rem; display: block;"></i>
+                    <p style="color: var(--text-muted);">No enriched indicators gathered. Please trigger pipeline analysis first.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Raw Log Tab -->
+        <div id="raw-pane" class="tab-pane">
+            <div class="glass-card">
+                <h3 class="display-font text-glow-cyan" style="margin-bottom: 1rem;">Raw Content Log Payload</h3>
+                <pre class="code-block">{{ alert.raw_content }}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function switchTab(evt, paneId) {
+        // Hide all panes
+        const panes = document.getElementsByClassName('tab-pane');
+        for (let i = 0; i < panes.length; i++) {
+            panes[i].classList.remove('active');
+        }
+        
+        // Deactivate all buttons
+        const buttons = document.getElementsByClassName('tab-button');
+        for (let i = 0; i < buttons.length; i++) {
+            buttons[i].classList.remove('active');
+        }
+        
+        // Show current pane and activate button
+        document.getElementById(paneId).classList.add('active');
+        evt.currentTarget.classList.add('active');
+    }
+</script>
+{% endblock %}
