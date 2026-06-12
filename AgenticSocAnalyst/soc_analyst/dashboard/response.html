@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}Response Center - Agentic SOC Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .response-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1.5rem;
+    }
+
+    .action-card {
+        background: rgba(30, 41, 59, 0.4);
+        border: 1px solid var(--border-ghost);
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: var(--transition-smooth);
+    }
+
+    .action-card:hover {
+        border-color: var(--color-cyan);
+    }
+
+    .action-details {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .action-badge {
+        display: inline-block;
+        padding: 0.15rem 0.4rem;
+        font-family: var(--font-headline);
+        font-size: 0.7rem;
+        font-weight: 600;
+        border-radius: 4px;
+        text-transform: uppercase;
+        width: fit-content;
+        margin-bottom: 0.25rem;
+    }
+
+    .action-badge-network {
+        background: rgba(255, 95, 95, 0.1);
+        color: #ff5f5f;
+        border: 1px solid rgba(255, 95, 95, 0.3);
+    }
+
+    .action-badge-identity {
+        background: rgba(236, 177, 255, 0.1);
+        color: var(--color-purple);
+        border: 1px solid rgba(236, 177, 255, 0.3);
+    }
+
+    .watchlist-form input, .watchlist-form select, .watchlist-form textarea {
+        width: 100%;
+        background: rgba(9, 14, 28, 0.5);
+        border: 1px solid var(--border-ghost);
+        color: var(--text-white);
+        border-radius: 6px;
+        padding: 0.6rem;
+        margin-top: 0.25rem;
+        margin-bottom: 0.75rem;
+        outline: none;
+        font-family: var(--font-body);
+        font-size: 0.85rem;
+    }
+
+    .watchlist-form input:focus, .watchlist-form select:focus, .watchlist-form textarea:focus {
+        border-color: var(--color-cyan);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <div class="header-title">
+        <h1>Response Center</h1>
+        <p>Human-in-the-loop (HITL) approval queue and network-wide containment watchlists.</p>
+    </div>
+</div>
+
+<div class="response-grid">
+    <!-- Left Column: Pending Actions & Audit Log -->
+    <div>
+        <!-- Approval Queue -->
+        <div class="glass-card">
+            <h3 class="display-font text-glow-cyan" style="margin-bottom: 1.5rem;"><i class="fa-solid fa-hourglass-half mr-2 text-cyan"></i> Awaiting Analyst Approval</h3>
+            
+            <div id="pending-actions-list">
+                {% if pending_actions %}
+                    {% for action in pending_actions %}
+                    <div class="action-card" id="action-card-{{ action.id }}">
+                        <div class="action-details">
+                            <div>
+                                <span class="action-badge {% if action.action_type in ['cloudflare_drop', 'aws_block_ip'] %}action-badge-network{% else %}action-badge-identity{% endif %}">
+                                    {{ action.action_type.replace('_', ' ') }}
+                                </span>
+                            </div>
+                            <h4 style="color: #fff; margin-bottom: 0.25rem;">Target: <span style="font-family: monospace; color: var(--color-cyan);">{{ action.target }}</span></h4>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Reason: {{ action.reason }}</p>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem;">
+                            <button class="btn-ghost" 
+                                    style="padding: 0.5rem 1rem; color: #ff5f5f; border-color: rgba(255,95,95,0.2);"
+                                    hx-post="/dashboard/response/reject/{{ action.id }}"
+                                    hx-target="#action-card-{{ action.id }}"
+                                    hx-swap="outerHTML">
+                                <i class="fa-solid fa-ban"></i> Reject
+                            </button>
+                            <button class="btn-neon" 
+                                    style="padding: 0.5rem 1.25rem; font-size: 0.8rem;"
+                                    hx-post="/dashboard/response/approve/{{ action.id }}"
+                                    hx-target="#action-card-{{ action.id }}"
+                                    hx-swap="outerHTML">
+                                <i class="fa-solid fa-play"></i> Approve
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div style="text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.875rem;">
+                        <i class="fa-solid fa-circle-check" style="font-size: 2rem; color: rgba(255,255,255,0.05); margin-bottom: 0.5rem; display: block;"></i>
+                        No response actions pending approval.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Audit Log -->
+        <div class="glass-card">
+            <h3 class="display-font text-glow-purple" style="margin-bottom: 1rem;"><i class="fa-solid fa-clipboard-list mr-2 text-purple"></i> Mitigation Audit History</h3>
+            
+            <div style="overflow-x: auto;">
+                <table class="neon-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Action Type</th>
+                            <th>Target</th>
+                            <th>Status</th>
+                            <th>Operator</th>
+                            <th>Result</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if audit_actions %}
+                            {% for act in audit_actions %}
+                            <tr>
+                                <td>{{ act.created_at.strftime('%Y-%m-%d %H:%M:%S') if act.created_at else 'Unknown' }}</td>
+                                <td>
+                                    <span style="font-size: 0.75rem; font-weight: bold; text-transform: uppercase;">
+                                        {{ act.action_type.replace('_', ' ') }}
+                                    </span>
+                                </td>
+                                <td style="font-family: monospace; color: var(--color-cyan);">{{ act.target }}</td>
+                                <td>
+                                    <span style="font-weight: bold; font-size: 0.75rem; text-transform: uppercase;
+                                        {% if act.approval_status == 'approved' %}color: #34d399;
+                                        {% elif act.approval_status == 'rejected' %}color: var(--text-muted);
+                                        {% else %}color: var(--color-cyan);
+                                        {% endif %}">
+                                        {{ act.approval_status }}
+                                    </span>
+                                </td>
+                                <td>{{ act.approved_by or '-' }}</td>
+                                <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--text-muted);">
+                                    {{ act.error_message or act.execution_result or 'Success' }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No logs found.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Watchlist & Add Watchlist Form -->
+    <div>
+        <!-- Add Watchlist Form -->
+        <div class="glass-card">
+            <h3 class="display-font text-glow-cyan" style="margin-bottom: 1rem;"><i class="fa-solid fa-user-plus mr-2 text-cyan"></i> Watchlist Indicator</h3>
+            
+            <form class="watchlist-form" 
+                  hx-post="/api/v1/response/watchlist" 
+                  hx-swap="none"
+                  hx-on::after-request="window.location.reload()">
+                <div class="form-group">
+                    <label class="form-label" style="color: var(--text-muted);">Indicator Value</label>
+                    <input type="text" name="value" placeholder="e.g. 192.168.1.155" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="color: var(--text-muted);">Indicator Type</label>
+                    <select name="watch_type">
+                        <option value="ip">IP Address</option>
+                        <option value="username">Username</option>
+                        <option value="domain">Domain Name</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="color: var(--text-muted);">Reason</label>
+                    <textarea name="reason" placeholder="Explain the containment reason" rows="3" required></textarea>
+                </div>
+                <button type="submit" class="btn-neon" style="width: 100%; justify-content: center; font-size: 0.85rem;">
+                    Add to Watchlist
+                </button>
+            </form>
+        </div>
+
+        <!-- Current Watchlist -->
+        <div class="glass-card">
+            <h3 class="display-font text-glow-purple" style="margin-bottom: 1rem;"><i class="fa-solid fa-list-check mr-2 text-purple"></i> Active Watchlist</h3>
+            
+            <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.8rem;">
+                {% if watchlist %}
+                    {% for item in watchlist %}
+                    <li style="border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 0.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+                            <span style="font-family: monospace; font-weight: 600; color: var(--color-cyan);">{{ item.value }}</span>
+                            <span class="neon-badge neon-badge-purple" style="font-size: 0.65rem; padding: 0.1rem 0.3rem;">{{ item.watch_type }}</span>
+                        </div>
+                        <p style="color: var(--text-muted); font-size: 0.75rem;">{{ item.reason }}</p>
+                    </li>
+                    {% endfor %}
+                {% else %}
+                    <li style="color: var(--text-muted); text-align: center; padding: 1.5rem 0;">No active watchlisted items.</li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
