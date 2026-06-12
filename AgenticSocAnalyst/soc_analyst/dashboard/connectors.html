@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}Connectors Config - Agentic SOC Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .connectors-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .connector-card {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        height: 100%;
+    }
+
+    .connector-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1.5rem;
+    }
+
+    .connector-title {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .connector-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        background-color: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border-ghost);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: var(--color-cyan);
+    }
+
+    .connector-meta {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .connector-meta-row {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+        padding-bottom: 0.25rem;
+    }
+
+    .connector-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid var(--border-ghost);
+        padding-top: 1rem;
+        margin-top: auto;
+    }
+
+    /* Switch button styling */
+    .switch-mode-btn {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border-ghost);
+        color: var(--color-cyan);
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        font-family: var(--font-headline);
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: var(--transition-smooth);
+    }
+
+    .switch-mode-btn:hover {
+        border-color: var(--color-cyan);
+        box-shadow: 0 0 10px rgba(0, 251, 251, 0.2);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <div class="header-title">
+        <h1>Vendor Connectors</h1>
+        <p>Integrate and toggle between live SIEM log sinks and realistic local threat simulation feeds.</p>
+    </div>
+</div>
+
+<div class="connectors-grid">
+    <!-- Wazuh SIEM Connector -->
+    <div class="glass-card connector-card">
+        <div>
+            <div class="connector-header">
+                <div class="connector-title">
+                    <div class="connector-icon">
+                        <i class="fa-solid fa-network-wired"></i>
+                    </div>
+                    <div>
+                        <h3 class="display-font">Wazuh SIEM</h3>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">Real-time Host Monitoring</span>
+                    </div>
+                </div>
+                <div id="mode-badge-wazuh">
+                    <span class="neon-badge neon-badge-cyan">LIVE MODE</span>
+                </div>
+            </div>
+            <div class="connector-meta">
+                <div class="connector-meta-row">
+                    <span>Integration Status</span>
+                    <span class="text-green-glow font-bold"><i class="fa-solid fa-circle-check"></i> Connected</span>
+                </div>
+                <div class="connector-meta-row">
+                    <span>Manager URL</span>
+                    <span style="font-family: monospace;">https://localhost:56000</span>
+                </div>
+                <div class="connector-meta-row">
+                    <span>Enrolled Agents</span>
+                    <span style="font-family: monospace;">1 (MAXW)</span>
+                </div>
+            </div>
+        </div>
+        <div class="connector-actions">
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Configured via setting parameters.</span>
+            <!-- Fixed Live connector -->
+            <button class="switch-mode-btn" style="opacity: 0.5; cursor: not-allowed;" disabled>
+                <i class="fa-solid fa-lock"></i> Fixed Live
+            </button>
+        </div>
+    </div>
+
+    <!-- Okta Identity Connector -->
+    <div class="glass-card connector-card">
+        <div>
+            <div class="connector-header">
+                <div class="connector-title">
+                    <div class="connector-icon" style="color: var(--color-purple);">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </div>
+                    <div>
+                        <h3 class="display-font">Okta IAM</h3>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">Identity & Access Management</span>
+                    </div>
+                </div>
+                <div id="mode-badge-okta">
+                    <span class="neon-badge {% if connector_modes.okta == 'live' %}neon-badge-cyan{% else %}neon-badge-purple{% endif %}">
+                        {{ connector_modes.okta.upper() }} MODE
+                    </span>
+                </div>
+            </div>
+            <div class="connector-meta">
+                <div class="connector-meta-row">
+                    <span>Integration Status</span>
+                    <span class="text-green-glow font-bold"><i class="fa-solid fa-circle-check"></i> Active</span>
+                </div>
+                <div class="connector-meta-row">
+                    <span>Telemetry Type</span>
+                    <span>Authentication Logs</span>
+                </div>
+                <div class="connector-meta-row">
+                    <span>Health Index</span>
+                    <span>100% nominal</span>
+                </div>
+            </div>
+        </div>
+        <div class="connector-actions">
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Toggle to simulated sink mode.</span>
+            <button class="switch-mode-btn" 
+                    hx-post="/dashboard/connectors/toggle/okta"
+                    hx-target="#mode-badge-okta"
+                    hx-swap="innerHTML">
+                <i class="fa-solid fa-shuffle"></i> Toggle Mode
+            </button>
+        </div>
+    </div>
+
+    <!-- AWS GuardDuty Connector -->
+    <div class="glass-card connector-card">
+        <div>
+            <div class="connector-header">
+                <div class="connector-title">
+                    <div class="connector-icon" style="color: var(--color-purple);">
+                        <i class="fa-brands fa-aws"></i>
+                    </div>
+                    <div>
+                        <h3 class="display-font">AWS GuardDuty</h3>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">Cloud Threat Intelligence</span>
+                    </div>
+                </div>
+                <div id="mode-badge-mock_guardduty">
+                    <span class="neon-badge {% if connector_modes.mock_guardduty == 'live' %}neon-badge-cyan{% else %}neon-badge-purple{% endif %}">
+                        {{ connector_modes.mock_guardduty.upper() }} MODE
+                    </span>
+                </div>
+            </div>
+            <div class="connector-meta">
+                <div class="connector-meta-row">
+                    <span>Integration Status</span>
+                    <span class="text-green-glow font-bold"><i class="fa-solid fa-circle-check"></i> Active</span>
+                </div>
+                <div class="connector-meta-row">
+                    <span>Telemetry Type</span>
+                    <span>CloudTrail / VPC flow logs</span>
+                </div>
+                <div class="connector-meta-row">
+                    <span>Health Index</span>
+                    <span>100% nominal</span>
+                </div>
+            </div>
+        </div>
+        <div class="connector-actions">
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Toggle cloud collector status.</span>
+            <button class="switch-mode-btn" 
+                    hx-post="/dashboard/connectors/toggle/mock_guardduty"
+                    hx-target="#mode-badge-mock_guardduty"
+                    hx-swap="innerHTML">
+                <i class="fa-solid fa-shuffle"></i> Toggle Mode
+            </button>
+        </div>
+    </div>
+
+    <!-- Microsoft Defender Connector -->
+    <div class="glass-card connector-card">
+        <div>
+            <div class="connector-header">
+                <div class="connector-title">
+                    <div class="connector-icon" style="color: var(--color-purple);">
+                        <i class="fa-brands fa-windows"></i>
+                    </div>
+                    <div>
+                        <h3 class="display-font">MS Defender</h3>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">Endpoint Detection & Response</span>
+                    </div>
+                </div>
+                <div id="mode-badge-mock_defender">
+                    <span class="neon-badge {% if connector_modes.mock_defender == 'live' %}neon-badge-cyan{% else %}neon-badge-purple{% endif %}">
+                        {{ connector_modes.mock_defender.upper() }} MODE
+                    </span>
+                </div>
+            </div>
+            <div class="connector-meta">
+                <div class="connector-meta-row">
+                    <span>Integration Status</span>
+                    <span class="text-green-glow font-bold"><i class="fa-solid fa-circle-check"></i> Active</span>
+                </div>
+                <div class="connector-meta-row">
+                    <span>Telemetry Type</span>
+                    <span>Process & File Operations</span>
+                </div>
+                <div class="connector-meta-row">
+                    <span>Health Index</span>
+                    <span>100% nominal</span>
+                </div>
+            </div>
+        </div>
+        <div class="connector-actions">
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Toggle endpoint collector status.</span>
+            <button class="switch-mode-btn" 
+                    hx-post="/dashboard/connectors/toggle/mock_defender"
+                    hx-target="#mode-badge-mock_defender"
+                    hx-swap="innerHTML">
+                <i class="fa-solid fa-shuffle"></i> Toggle Mode
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
