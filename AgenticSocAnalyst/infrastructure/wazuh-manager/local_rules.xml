@@ -1,0 +1,185 @@
+<!-- ==========================================================================
+     Custom Detection Rules — Agentic SOC Analyst Project
+     Location: /var/ossec/etc/rules/local_rules.xml
+     These rules supplement the default Wazuh ruleset.
+     ========================================================================== -->
+
+<group name="soc-analyst,custom,">
+
+  <!-- ======================================================================
+       SSH / AUTHENTICATION ATTACK RULES
+       ====================================================================== -->
+
+  <!-- SSH Rapid Brute Force (10 failures in 30s) -->
+  <rule id="100010" level="10" frequency="10" timeframe="30">
+    <if_matched_sid>5710</if_matched_sid>
+    <same_source_ip />
+    <description>SSH rapid brute force: 10 failures in 30 seconds from same source</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>authentication_failures,brute_force,soc-high,</group>
+  </rule>
+
+  <!-- Password Spray (failures across multiple users from same IP) -->
+  <rule id="100011" level="10" frequency="5" timeframe="60">
+    <if_matched_sid>5710</if_matched_sid>
+    <same_source_ip />
+    <different_dstuser />
+    <description>Password spraying detected: multiple users targeted from same IP</description>
+    <mitre>
+      <id>T1110.003</id>
+    </mitre>
+    <group>authentication_failures,password_spray,soc-high,</group>
+  </rule>
+
+  <!-- Successful login after multiple failures (possible breach) -->
+  <rule id="100012" level="12" timeframe="120">
+    <if_matched_sid>100010</if_matched_sid>
+    <if_sid>5715</if_sid>
+    <same_source_ip />
+    <description>Successful SSH login AFTER brute force — possible compromise!</description>
+    <mitre>
+      <id>T1078</id>
+    </mitre>
+    <group>authentication_success,brute_force,soc-critical,</group>
+  </rule>
+
+  <!-- ======================================================================
+       NETWORK SCAN RULES
+       ====================================================================== -->
+
+  <!-- Nmap port scan detection (via firewall logs / IDS) -->
+  <rule id="100020" level="8">
+    <if_sid>40101</if_sid>
+    <match>nmap</match>
+    <description>Nmap scan detected in logs</description>
+    <mitre>
+      <id>T1046</id>
+    </mitre>
+    <group>network_scan,soc-medium,</group>
+  </rule>
+
+  <!-- Large number of connection attempts from single host -->
+  <rule id="100021" level="8" frequency="50" timeframe="60">
+    <if_matched_sid>1002</if_matched_sid>
+    <same_source_ip />
+    <description>Possible port scan: 50+ connection attempts from single IP in 60s</description>
+    <mitre>
+      <id>T1046</id>
+    </mitre>
+    <group>network_scan,soc-medium,</group>
+  </rule>
+
+  <!-- ======================================================================
+       MALWARE / FILE RULES
+       ====================================================================== -->
+
+  <!-- EICAR test file detected -->
+  <rule id="100030" level="12">
+    <if_sid>554</if_sid>
+    <match>EICAR|eicar</match>
+    <description>EICAR test malware file detected — antimalware validation</description>
+    <mitre>
+      <id>T1027</id>
+    </mitre>
+    <group>malware,soc-high,</group>
+  </rule>
+
+  <!-- Executable created in /tmp -->
+  <rule id="100031" level="10">
+    <if_sid>554</if_sid>
+    <field name="file">/tmp/</field>
+    <match>\.sh$|\.py$|\.elf$|\.bin$</match>
+    <description>Executable file created in /tmp directory — suspicious</description>
+    <mitre>
+      <id>T1059</id>
+    </mitre>
+    <group>malware,suspicious_file,soc-high,</group>
+  </rule>
+
+  <!-- ======================================================================
+       PRIVILEGE ESCALATION RULES
+       ====================================================================== -->
+
+  <!-- sudo command not allowed -->
+  <rule id="100040" level="8">
+    <if_sid>5402</if_sid>
+    <description>sudo: unauthorized command attempt</description>
+    <mitre>
+      <id>T1548.003</id>
+    </mitre>
+    <group>privilege_escalation,soc-medium,</group>
+  </rule>
+
+  <!-- SUID binary search (recon for privesc) -->
+  <rule id="100041" level="8">
+    <if_sid>5503</if_sid>
+    <match>find.*-perm.*4000|find.*-suid</match>
+    <description>SUID binary search detected — potential privilege escalation recon</description>
+    <mitre>
+      <id>T1548.001</id>
+    </mitre>
+    <group>privilege_escalation,recon,soc-medium,</group>
+  </rule>
+
+  <!-- su command failed -->
+  <rule id="100042" level="7" frequency="5" timeframe="120">
+    <if_matched_sid>5303</if_matched_sid>
+    <same_source_ip />
+    <description>Multiple failed su attempts — possible local escalation attempt</description>
+    <mitre>
+      <id>T1548</id>
+    </mitre>
+    <group>privilege_escalation,soc-medium,</group>
+  </rule>
+
+  <!-- ======================================================================
+       SYSTEM ABUSE RULES
+       ====================================================================== -->
+
+  <!-- /etc/passwd read by non-root -->
+  <rule id="100050" level="7">
+    <if_sid>554</if_sid>
+    <field name="file">/etc/passwd</field>
+    <description>Sensitive file /etc/passwd accessed — user enumeration possible</description>
+    <mitre>
+      <id>T1087.001</id>
+    </mitre>
+    <group>system_abuse,user_enum,soc-medium,</group>
+  </rule>
+
+  <!-- Crontab modification -->
+  <rule id="100051" level="8">
+    <if_sid>554</if_sid>
+    <field name="file">/etc/cron|/var/spool/cron</field>
+    <description>Crontab modified — possible persistence mechanism</description>
+    <mitre>
+      <id>T1053.003</id>
+    </mitre>
+    <group>persistence,system_abuse,soc-high,</group>
+  </rule>
+
+  <!-- Suspicious process: netcat / ncat -->
+  <rule id="100052" level="10">
+    <if_sid>5400</if_sid>
+    <match>nc |ncat |netcat |/bin/nc|/usr/bin/nc</match>
+    <description>Netcat execution detected — potential backdoor or exfiltration</description>
+    <mitre>
+      <id>T1059.004</id>
+    </mitre>
+    <group>suspicious_process,soc-high,</group>
+  </rule>
+
+  <!-- Python/Perl reverse shell indicators -->
+  <rule id="100053" level="12">
+    <if_sid>5400</if_sid>
+    <match>python.*socket.*connect|perl.*socket|bash.*&gt;&amp;.*&amp;</match>
+    <description>Possible reverse shell command detected</description>
+    <mitre>
+      <id>T1059</id>
+    </mitre>
+    <group>reverse_shell,soc-critical,</group>
+  </rule>
+
+</group>
