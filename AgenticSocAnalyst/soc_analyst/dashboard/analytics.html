@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics Report - Agentic SOC Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .analytics-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 280px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .metric-hero-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .metric-hero-card {
+        padding: 1.5rem;
+        text-align: center;
+    }
+
+    .metric-value {
+        font-family: var(--font-headline);
+        font-size: 2.25rem;
+        font-weight: 700;
+        color: var(--text-white);
+        margin-top: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <div class="header-title">
+        <h1>Analytics Report</h1>
+        <p>Statistical aggregations, telemetry trends, and MITRE ATT&CK coverage maps.</p>
+    </div>
+</div>
+
+<!-- Hero metrics -->
+<div class="metric-hero-grid">
+    <div class="glass-card metric-hero-card">
+        <div style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Total Normalized Alerts</div>
+        <div class="metric-value text-glow-cyan" style="color: var(--color-cyan);">
+            {{ severity_counts.values() | sum }}
+        </div>
+    </div>
+    <div class="glass-card metric-hero-card">
+        <div style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Critical Detections</div>
+        <div class="metric-value text-glow-purple" style="color: var(--color-critical);">
+            {{ severity_counts.CRITICAL }}
+        </div>
+    </div>
+    <div class="glass-card metric-hero-card">
+        <div style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Injection Blocks</div>
+        <div class="metric-value text-glow-cyan" style="color: var(--color-cyan);">
+            {{ injection_blocks }}
+        </div>
+    </div>
+    <div class="glass-card metric-hero-card">
+        <div style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">MITRE ATT&CK Tactics</div>
+        <div class="metric-value text-glow-purple" style="color: var(--color-purple);">
+            {{ mitre_counts.keys() | length }}
+        </div>
+    </div>
+</div>
+
+<div class="analytics-grid">
+    <!-- Severity Breakdown -->
+    <div class="glass-card">
+        <div class="card-header">
+            <h3 class="display-font"><i class="fa-solid fa-triangle-exclamation mr-2 text-cyan"></i> Alerts by Severity</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="chart-severity"></canvas>
+        </div>
+    </div>
+
+    <!-- Telemetry Sources -->
+    <div class="glass-card">
+        <div class="card-header">
+            <h3 class="display-font"><i class="fa-solid fa-circle-nodes mr-2 text-purple"></i> Telemetry Sources</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="chart-sources"></canvas>
+        </div>
+    </div>
+
+    <!-- Investigation Status -->
+    <div class="glass-card">
+        <div class="card-header">
+            <h3 class="display-font"><i class="fa-solid fa-list-check mr-2 text-purple"></i> Investigation Status</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="chart-status"></canvas>
+        </div>
+    </div>
+
+    <!-- MITRE Coverage -->
+    <div class="glass-card">
+        <div class="card-header">
+            <h3 class="display-font"><i class="fa-solid fa-shield-halved mr-2 text-cyan"></i> Top MITRE ATT&CK Techniques</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="chart-mitre"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Inline charts initialization script -->
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Shared Chart.js options
+        const fontColor = '#94a3b8';
+        const gridColor = 'rgba(255, 255, 255, 0.05)';
+        Chart.defaults.color = fontColor;
+        Chart.defaults.borderColor = gridColor;
+
+        // 1. Severity Chart
+        const severityCtx = document.getElementById('chart-severity').getContext('2d');
+        const severityData = {
+            labels: ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+            datasets: [{
+                data: [
+                    {{ severity_counts.INFO }},
+                    {{ severity_counts.LOW }},
+                    {{ severity_counts.MEDIUM }},
+                    {{ severity_counts.HIGH }},
+                    {{ severity_counts.CRITICAL }}
+                ],
+                backgroundColor: ['#60a5fa', '#34d399', '#fcd34d', '#ff914d', '#ff5f5f'],
+                borderWidth: 0
+            }]
+        };
+        new Chart(severityCtx, {
+            type: 'doughnut',
+            data: severityData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' }
+                }
+            }
+        });
+
+        // 2. Sources Chart
+        const sourcesCtx = document.getElementById('chart-sources').getContext('2d');
+        const sourceLabels = [];
+        const sourceValues = [];
+        {% for src, cnt in source_counts.items() %}
+            sourceLabels.push('{{ src }}');
+            sourceValues.push({{ cnt }});
+        {% endfor %}
+
+        new Chart(sourcesCtx, {
+            type: 'bar',
+            data: {
+                labels: sourceLabels.length ? sourceLabels : ['No Data'],
+                datasets: [{
+                    label: 'Alert Count',
+                    data: sourceValues.length ? sourceValues : [0],
+                    backgroundColor: 'rgba(0, 251, 251, 0.4)',
+                    borderColor: '#00fbfb',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        // 3. Status Chart
+        const statusCtx = document.getElementById('chart-status').getContext('2d');
+        const statusLabels = [];
+        const statusValues = [];
+        {% for st, cnt in status_counts.items() %}
+            statusLabels.push('{{ st.upper() }}');
+            statusValues.push({{ cnt }});
+        {% endfor %}
+
+        new Chart(statusCtx, {
+            type: 'pie',
+            data: {
+                labels: statusLabels.length ? statusLabels : ['No Data'],
+                datasets: [{
+                    data: statusValues.length ? statusValues : [0],
+                    backgroundColor: ['#94a3b8', '#34d399', '#00fbfb', '#ecb1ff', '#ff5f5f'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' }
+                }
+            }
+        });
+
+        // 4. MITRE ATT&CK Chart
+        const mitreCtx = document.getElementById('chart-mitre').getContext('2d');
+        const mitreLabels = [];
+        const mitreValues = [];
+        {% for tech, cnt in mitre_counts.items() %}
+            mitreLabels.push('{{ tech }}');
+            mitreValues.push({{ cnt }});
+        {% endfor %}
+
+        new Chart(mitreCtx, {
+            type: 'bar',
+            data: {
+                labels: mitreLabels.length ? mitreLabels : ['No Data'],
+                datasets: [{
+                    label: 'Alert Frequency',
+                    data: mitreValues.length ? mitreValues : [0],
+                    backgroundColor: 'rgba(236, 177, 255, 0.4)',
+                    borderColor: '#ecb1ff',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { beginAtZero: true }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
