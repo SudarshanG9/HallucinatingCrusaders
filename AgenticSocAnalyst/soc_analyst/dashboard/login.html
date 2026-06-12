@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HallucinatingCrusaders - Initialize Session</title>
+
+    <!-- Premium Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --bg-dark: #0e1322;
+            --bg-card: rgba(22, 27, 43, 0.6);
+            --border-glow: rgba(0, 251, 251, 0.15);
+            --border-ghost: rgba(58, 74, 73, 0.25);
+
+            --text-main: #dee1f7;
+            --text-muted: #94a3b8;
+            --text-white: #ffffff;
+
+            --color-cyan: #00fbfb;
+            --color-purple: #ecb1ff;
+            --font-headline: 'Space Grotesk', sans-serif;
+            --font-body: 'Inter', sans-serif;
+
+            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Ambient Glow Decoration */
+        .ambient-glow-1 {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(0, 251, 251, 0.05) 0%, rgba(236, 177, 255, 0.02) 50%, transparent 70%);
+            filter: blur(80px);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .login-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 440px;
+            padding: 1.5rem;
+        }
+
+        .glass-panel {
+            background: var(--bg-card);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--border-ghost);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            border-radius: 16px;
+            padding: 2.5rem;
+            transition: var(--transition-smooth);
+        }
+
+        .glass-panel:hover {
+            border-color: var(--border-glow);
+            box-shadow: 0 0 30px rgba(0, 251, 251, 0.1);
+        }
+
+        .header-section {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .brand-icon {
+            font-size: 2.5rem;
+            color: var(--color-cyan);
+            text-shadow: 0 0 15px rgba(0, 251, 251, 0.6);
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-family: var(--font-headline);
+            font-weight: 700;
+            font-size: 1.75rem;
+            color: var(--text-white);
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-family: var(--font-headline);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--color-cyan);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1rem;
+            transition: var(--transition-smooth);
+        }
+
+        .form-input {
+            width: 100%;
+            background-color: rgba(9, 14, 28, 0.7);
+            border: 1px solid var(--border-ghost);
+            border-radius: 10px;
+            padding: 1rem 1rem 1rem 2.75rem;
+            color: var(--text-white);
+            font-size: 0.95rem;
+            outline: none;
+            transition: var(--transition-smooth);
+        }
+
+        .form-input:focus {
+            border-color: var(--color-cyan);
+            background-color: rgba(9, 14, 28, 0.9);
+            box-shadow: 0 0 10px rgba(0, 251, 251, 0.2);
+        }
+
+        .form-input:focus+.input-icon {
+            color: var(--color-cyan);
+        }
+
+        .btn-submit {
+            width: 100%;
+            background: linear-gradient(135deg, var(--color-cyan) 0%, var(--color-purple) 100%);
+            color: var(--bg-dark);
+            border: none;
+            padding: 1rem;
+            border-radius: 10px;
+            font-family: var(--font-headline);
+            font-weight: 700;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            margin-top: 1rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-submit:hover {
+            box-shadow: 0 0 25px rgba(0, 251, 251, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-submit:active {
+            transform: translateY(1px);
+        }
+
+        .error-banner {
+            background-color: rgba(255, 95, 95, 0.1);
+            border: 1px solid rgba(255, 95, 95, 0.3);
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: #ff5f5f;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        /* Tech HUD Lines */
+        .hud-line {
+            position: absolute;
+            font-family: var(--font-headline);
+            font-size: 9px;
+            color: rgba(0, 251, 251, 0.25);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .hud-top-left {
+            top: 20px;
+            left: 20px;
+        }
+
+        .hud-bottom-left {
+            bottom: 20px;
+            left: 20px;
+        }
+
+        .hud-bottom-right {
+            bottom: 20px;
+            right: 20px;
+            text-align: right;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="ambient-glow-1"></div>
+
+    <!-- HUD Telemetry overlays -->
+    <div class="hud-line hud-top-left">
+        SYS_STATUS: NOMINAL<br>
+        LOC: HALLUCINATINGCRUSADERS_BASE
+    </div>
+    <div class="hud-line hud-bottom-left">
+        NETWORK: VERIFIED_TLS<br>
+        SECURITY: ACTIVE_SHIELD
+    </div>
+    <div class="hud-line hud-bottom-right">
+        TERM_CIPHER: AES-256-GCM<br>
+        SOC_NODE: MAXW_v4.2
+    </div>
+
+    <div class="login-container">
+        <div class="glass-panel">
+            <div class="header-section">
+                <i class="fa-solid fa-shield-halved brand-icon"></i>
+                <h1>Initialize Session</h1>
+                <p class="subtitle">Access the secure threat monitoring grid.</p>
+            </div>
+
+            {% if error %}
+            <div class="error-banner">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+
+            <form action="/login" method="POST">
+                <div class="form-group">
+                    <label class="form-label" for="username">Operator Identifier</label>
+                    <div class="input-wrapper">
+                        <input class="form-input" type="text" id="username" name="username" placeholder="Username"
+                            required autocomplete="username">
+                        <i class="fa-solid fa-user-shield input-icon"></i>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">Access Cipher</label>
+                    <div class="input-wrapper">
+                        <input class="form-input" type="password" id="password" name="password" placeholder="Password"
+                            required autocomplete="current-password">
+                        <i class="fa-solid fa-key input-icon"></i>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit">
+                    Access Interface <i class="fa-solid fa-chevron-right ml-1"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+
+</html>
