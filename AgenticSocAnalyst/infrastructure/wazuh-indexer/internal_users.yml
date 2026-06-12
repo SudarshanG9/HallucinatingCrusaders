@@ -1,0 +1,61 @@
+---
+# Wazuh Indexer internal users
+# Passwords are bcrypt hashed
+# Default: admin/SecretPassword  |  kibanaserver/kibanaserver
+# To rehash: docker run --rm wazuh/wazuh-indexer:4.7.3 bash -c "plugins/opensearch-security/tools/hash.sh -p <password>"
+
+_meta:
+  type: "internalusers"
+  config_version: 2
+
+admin:
+  hash: "$2y$12$K/SpwjtB.wOHJ/Nc6GVRDuc1h0rM1DfvziFRNPtk27P.c4yDr9njO"
+  reserved: true
+  backend_roles:
+    - "admin"
+  description: "Admin user"
+
+kibanaserver:
+  hash: "$2a$12$4AcgAt3xwOWadA5s5blL6ev39OXDNhmOesEoo33eZtrq2N0YrU3H."
+  reserved: true
+  description: "OpenSearch Dashboards user"
+
+kibanaro:
+  hash: "$2a$12$JJSXNfTowz7Uu5ttXfeYpeYE0arACvcwleFApu7Sfy.wTtHbIQ62."
+  reserved: false
+  backend_roles:
+    - "kibanauser"
+    - "readall"
+  attributes:
+    attribute1: "value1"
+    attribute2: "value2"
+    attribute3: "value3"
+  description: "OpenSearch Dashboards read only user"
+
+logstash:
+  hash: "$2a$12$u1ShR4l4uBS3Uv59Pa2y5.1uQuZBrZtmNfqB3iM/.jL0XoV9sghuo"
+  reserved: false
+  backend_roles:
+    - "logstash"
+  description: "Logstash user"
+
+readall:
+  hash: "$2a$12$ae4ycwzwvLtZxwZ82RmiEunBbIPiAmGZduBAjKN0TXdwQFtCwARz2"
+  reserved: false
+  backend_roles:
+    - "readall"
+  description: "Read-only user"
+
+snapshotrestore:
+  hash: "$2y$12$DpwmetHKwgYnorbgdvORCenv4NAK8cPUg8AI6pxvjfex4FlnIu.He"
+  reserved: false
+  backend_roles:
+    - "snapshotrestore"
+  description: "Snapshot restore user"
+
+wazuh-wui:
+  hash: "$2y$12$K/SpwjtB.wOHJ/Nc6GVRDuc1h0rM1DfvziFRNPtk27P.c4yDr9njO"
+  reserved: true
+  backend_roles:
+    - "admin"
+  description: "Wazuh WUI user"
