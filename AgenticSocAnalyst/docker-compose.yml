@@ -1,24 +1,194 @@
-version: "3.9"
+# =============================================================================
+# HallucinatingCrusaders — Wazuh Stack (Phase 1)
+# Wazuh Manager + Indexer (OpenSearch) + Dashboard
+# Run: docker-compose up -d
+# Dashboard: https://localhost:443   admin / SecretPassword
+# =============================================================================
+
+version: '3.9'
 
 services:
-  soc_analyst:
-    build: .
-    env_file: .env
-    depends_on:
-      - postgres
-    volumes:
-      - ./soc_analyst:/app/soc_analyst
 
-  postgres:
-    image: postgres:15-alpine
+  # ---------------------------------------------------------------------------
+  # Wazuh Indexer (OpenSearch)
+  # ---------------------------------------------------------------------------
+  wazuh.indexer:
+    image: wazuh/wazuh-indexer:4.7.3
+    container_name: wazuh.indexer
+    hostname: wazuh.indexer
+    restart: always
+    ports:
+      - "9200:9200"
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
+      - network.host=0.0.0.0
+      - node.name=wazuh.indexer
+      - cluster.initial_master_nodes=wazuh.indexer
+      - cluster.name=wazuh-cluster
+      - bootstrap.memory_lock=false
+      - OPENSEARCH_SECURITY_SSL_HTTP_ENABLED=true
+      - OPENSEARCH_SECURITY_SSL_HTTP_PEMCERT_FILEPATH=/usr/share/wazuh-indexer/certs/wazuh.indexer.pem
+      - OPENSEARCH_SECURITY_SSL_HTTP_PEMKEY_FILEPATH=/usr/share/wazuh-indexer/certs/wazuh.indexer-key.pem
+      - OPENSEARCH_SECURITY_SSL_HTTP_PEMTRUSTEDCAS_FILEPATH=/usr/share/wazuh-indexer/certs/root-ca.pem
+      - OPENSEARCH_SECURITY_SSL_TRANSPORT_PEMCERT_FILEPATH=/usr/share/wazuh-indexer/certs/wazuh.indexer.pem
+      - OPENSEARCH_SECURITY_SSL_TRANSPORT_PEMKEY_FILEPATH=/usr/share/wazuh-indexer/certs/wazuh.indexer-key.pem
+      - OPENSEARCH_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH=/usr/share/wazuh-indexer/certs/root-ca.pem
+      - OPENSEARCH_SECURITY_SSL_TRANSPORT_ENFORCE_HOSTNAME_VERIFICATION=false
+      - OPENSEARCH_SECURITY_SSL_HTTP_CLIENTAUTH_MODE=OPTIONAL
+      - OPENSEARCH_SECURITY_AUTHCZ_ADMIN_DN=CN=admin,OU=Wazuh,O=Wazuh,L=California,C=US
+      - OPENSEARCH_SECURITY_CHECK_SNAPSHOT_RESTORE_WRITE_PRIVILEGES=true
+      - OPENSEARCH_SECURITY_ENABLE_SNAPSHOT_RESTORE_PRIVILEGE=true
+      - OPENSEARCH_SECURITY_NODES_DN=CN=wazuh.indexer,OU=Wazuh,O=Wazuh,L=California,C=US
+      - OPENSEARCH_SECURITY_RESTAPI_ROLES_ENABLED=all_access,security_rest_api_access
+      - OPENSEARCH_SECURITY_SYSTEM_INDICES_ENABLED=true
+      - OPENSEARCH_SECURITY_SYSTEM_INDICES_INDICES=.plugins-ml-model,.plugins-ml-task,.opendistro-alerting-config,.opendistro-alerting-alert,.opendistro-anomaly-results,.opendistro-anomaly-detector,.opendistro-anomaly-checkpoints,.opendistro-anomaly-detection-state,.opendistro-reports-definitions,.opendistro-reports-instances,.opendistro-notifications-config,.opensearch-notebooks,.opensearch-observability,.plugins-ml-model-group,.plugins-flow-framework-config,.plugins-flow-framework-templates,.plugins-flow-framework-state
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - DISABLE_SECURITY_CONFIGURATION_PLUGIN=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - wazuh-indexer-data:/var/lib/wazuh-indexer
+      - ./infrastructure/certs/wazuh.indexer.pem:/usr/share/wazuh-indexer/certs/wazuh.indexer.pem
+      - ./infrastructure/certs/wazuh.indexer-key.pem:/usr/share/wazuh-indexer/certs/wazuh.indexer-key.pem
+      - ./infrastructure/certs/admin.pem:/usr/share/wazuh-indexer/certs/admin.pem
+      - ./infrastructure/certs/admin-key.pem:/usr/share/wazuh-indexer/certs/admin-key.pem
+      - ./infrastructure/certs/root-ca.pem:/usr/share/wazuh-indexer/certs/root-ca.pem
+      - ./infrastructure/wazuh-indexer/wazuh.indexer.yml:/usr/share/wazuh-indexer/opensearch.yml
+      - ./infrastructure/wazuh-indexer/internal_users.yml:/usr/share/wazuh-indexer/opensearch-security/internal_users.yml
+    networks:
+      - soc-network
+
+  # ---------------------------------------------------------------------------
+  # Wazuh Manager
+  # ---------------------------------------------------------------------------
+  wazuh.manager:
+    image: wazuh/wazuh-manager:4.7.3
+    container_name: wazuh.manager
+    hostname: wazuh.manager
+    restart: always
+    ports:
+      - "1514:1514"       # Agent communication
+      - "1515:1515"       # Agent enrollment
+      - "514:514/udp"     # Syslog
+      - "56000:55000"     # Wazuh REST API (host 56000 -> container 55000)
+    environment:
+      - INDEXER_URL=https://wazuh.indexer:9200
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=SecretPassword
+      - FILEBEAT_SSL_VERIFICATION_MODE=full
+      - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
+      - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
+      - SSL_KEY=/etc/ssl/filebeat-key.pem
+      - API_USERNAME=wazuh-wui
+      - API_PASSWORD=MyS3cr37P450r.*-
+    volumes:
+      - wazuh-api-configuration:/var/ossec/api/configuration
+      - wazuh-etc:/var/ossec/etc
+      - wazuh-logs:/var/ossec/logs
+      - wazuh-queue:/var/ossec/queue
+      - wazuh-var-multigroups:/var/ossec/var/multigroups
+      - wazuh-integrations:/var/ossec/integrations
+      - wazuh-active-response:/var/ossec/active-response/bin
+      - wazuh-agentless:/var/ossec/agentless
+      - wazuh-wodles:/var/ossec/wodles
+      - filebeat-etc:/etc/filebeat
+      - filebeat-var:/var/lib/filebeat
+      - ./infrastructure/certs/root-ca-manager.pem:/etc/ssl/root-ca.pem
+      - ./infrastructure/certs/wazuh.manager.pem:/etc/ssl/filebeat.pem
+      - ./infrastructure/certs/wazuh.manager-key.pem:/etc/ssl/filebeat-key.pem
+      - ./infrastructure/wazuh-manager/ossec.conf:/wazuh-config-mount/etc/ossec.conf
+    networks:
+      - soc-network
+
+  # ---------------------------------------------------------------------------
+  # Wazuh Dashboard (Kibana-style UI)
+  # ---------------------------------------------------------------------------
+  wazuh.dashboard:
+    image: wazuh/wazuh-dashboard:4.7.3
+    container_name: wazuh.dashboard
+    hostname: wazuh.dashboard
+    restart: always
+    ports:
+      - "443:5601"
+    environment:
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=SecretPassword
+      - WAZUH_API_URL=https://wazuh.manager
+      - DASHBOARD_USERNAME=kibanaserver
+      - DASHBOARD_PASSWORD=kibanaserver
+      - API_USERNAME=wazuh-wui
+      - API_PASSWORD=MyS3cr37P450r.*-
+    volumes:
+      - ./infrastructure/certs/wazuh.dashboard.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard.pem
+      - ./infrastructure/certs/wazuh.dashboard-key.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard-key.pem
+      - ./infrastructure/certs/root-ca.pem:/usr/share/wazuh-dashboard/certs/root-ca.pem
+      - ./infrastructure/wazuh-dashboard/opensearch_dashboards.yml:/usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
+      - ./infrastructure/wazuh-dashboard/wazuh.yml:/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml
+    depends_on:
+      - wazuh.indexer
+      - wazuh.manager
+    networks:
+      - soc-network
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — Alert database for the AI agent pipeline
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: soc-postgres
+    restart: always
     ports:
       - "5432:5432"
+    environment:
+      POSTGRES_DB: soc_analyst
+      POSTGRES_USER: soc_user
+      POSTGRES_PASSWORD: soc_password
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - soc-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U soc_user -d soc_analyst"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # ChromaDB — Vector database for incident memory (Phase 9)
+  # ---------------------------------------------------------------------------
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: soc-chromadb
+    restart: always
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    networks:
+      - soc-network
 
 volumes:
-  postgres_data:
+  wazuh-api-configuration:
+  wazuh-etc:
+  wazuh-logs:
+  wazuh-queue:
+  wazuh-var-multigroups:
+  wazuh-integrations:
+  wazuh-active-response:
+  wazuh-agentless:
+  wazuh-wodles:
+  filebeat-etc:
+  filebeat-var:
+  wazuh-indexer-data:
+  postgres-data:
+  chroma-data:
+
+networks:
+  soc-network:
+    driver: bridge
