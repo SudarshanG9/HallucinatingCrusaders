@@ -1,31 +1,61 @@
-# Environment & secrets
-.env
-
 # Python
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
 .Python
+env/
 venv/
 .venv/
-env/
-*.egg-info/
-dist/
-build/
+var/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ipynb_checkpoints/
 
-# IDE
+# Environment Variables
+.env
+.env.local
+.env.*
+!.env.example
+
+# IDEs and Editors
 .vscode/
 .idea/
 *.swp
+*.swo
+.project
+.pydevproject
+.settings/
+
+# Databases and Local Volumes
+/postgres_data/
+/chromadb_data/
+/wazuh_data/
+/opensearch_data/
+*.db
+*.sqlite3
+
+# Certificates and Keys
+/certs/
+/infrastructure/certs/
+*.pem
+*.crt
+*.key
+*.csr
 
 # Logs
 *.log
 logs/
+/soc_analyst/logs/
 
-# Docker
-*.dockerignore
-
-# OS
-.DS_Store
+# OS files
 Thumbs.db
+db.db
+Desktop.ini
+.DS_Store
+
+# Temporary brain logs (Antigravity session logs)
+.gemini/
+/brain/
