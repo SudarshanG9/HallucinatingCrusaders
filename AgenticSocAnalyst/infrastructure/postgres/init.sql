@@ -113,3 +113,77 @@ CREATE INDEX IF NOT EXISTS idx_investigations_status        ON investigations (s
 CREATE INDEX IF NOT EXISTS idx_investigations_classification ON investigations (classification);
 CREATE INDEX IF NOT EXISTS idx_investigations_severity       ON investigations (severity);
 CREATE INDEX IF NOT EXISTS idx_investigations_started_at     ON investigations (started_at DESC);
+
+
+
+-- =============================================================================
+-- RESPONSE ACTIONS TABLE
+-- Human-in-the-loop approval queue for automated responses
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS response_actions (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    investigation_id    UUID REFERENCES investigations(id),
+    alert_id            VARCHAR(64) REFERENCES alerts(id),
+    
+    -- Action definition
+    action_type         VARCHAR(64) NOT NULL,          -- block_ip|disable_user|kill_process|isolate_endpoint|create_ticket
+    target              VARCHAR(256) NOT NULL,          -- IP, username, PID, hostname, etc.
+    reason              TEXT NOT NULL,
+    
+    -- Approval workflow
+    requires_approval   BOOLEAN DEFAULT TRUE,
+    approval_status     VARCHAR(32) DEFAULT 'pending'  -- pending|approved|rejected|auto_approved
+                        CHECK (approval_status IN ('pending','approved','rejected','auto_approved')),
+    approved_by         VARCHAR(128),
+    approval_notes      TEXT,
+    
+    -- Execution
+    executed            BOOLEAN DEFAULT FALSE,
+    executed_at         TIMESTAMPTZ,
+    execution_result    JSONB,
+    error_message       TEXT,
+    
+    -- Timestamps
+    created_at          TIMESTAMPTZ DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_response_actions_status ON response_actions (approval_status);
+CREATE INDEX IF NOT EXISTS idx_response_actions_type   ON response_actions (action_type);
+
+
+-- =============================================================================
+-- INCIDENT MEMORY TABLE
+-- Persistent knowledge base for cross-incident correlation
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS incident_memory (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    
+    -- Source
+    investigation_id UUID REFERENCES investigations(id),
+    
+    -- IOCs
+    ioc_type        VARCHAR(32)      -- ip|domain|hash|username|hostname
+                    CHECK (ioc_type IN ('ip','domain','hash','username','hostname','url')),
+    ioc_value       VARCHAR(256) NOT NULL,
+    
+    -- Context
+    context         JSONB DEFAULT '{}',
+    tags            TEXT[],
+    
+    -- Reputation (cached)
+    reputation_score    FLOAT,
+    reputation_data     JSONB DEFAULT '{}',
+    
+    -- Timestamps
+    first_seen      TIMESTAMPTZ DEFAULT NOW(),
+    last_seen       TIMESTAMPTZ DEFAULT NOW(),
+    occurrence_count INTEGER DEFAULT 1,
+    
+    UNIQUE(ioc_type, ioc_value)
+);
+
+CREATE INDEX IF NOT EXISTS idx_memory_ioc_value ON incident_memory (ioc_value);
+CREATE INDEX IF NOT EXISTS idx_memory_ioc_type  ON incident_memory (ioc_type);
+CREATE INDEX IF NOT EXISTS idx_memory_last_seen ON incident_memory (last_seen DESC);
+
