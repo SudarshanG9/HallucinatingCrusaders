@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Alerts Feed - Agentic SOC Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <div class="header-title">
+        <h1>Alerts Feed</h1>
+        <p>Live, normalized security alerts collected across multi-vendor telemetry sources.</p>
+    </div>
+    <div class="header-actions">
+        <!-- Live status indicator -->
+        <span class="neon-badge neon-badge-cyan" style="display: flex; align-items: center; gap: 0.5rem; font-weight: bold;">
+            <i class="fa-solid fa-spinner fa-spin"></i> Live Polling Active (10s)
+        </span>
+    </div>
+</div>
+
+<div class="glass-card">
+    <div class="card-header">
+        <h3 class="display-font text-glow-cyan"><i class="fa-solid fa-bell-concierge mr-2 text-cyan"></i> Normalised Events</h3>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <select id="filter-source" class="btn-ghost" style="padding: 0.4rem; font-size: 0.85rem;" 
+                    hx-get="/dashboard/alerts/table" 
+                    hx-include="[id='filter-severity']"
+                    hx-target="#alerts-table-container">
+                <option value="">All Sources</option>
+                <option value="wazuh">Wazuh SIEM</option>
+                <option value="okta">Okta Auth</option>
+                <option value="mock_guardduty">AWS GuardDuty</option>
+                <option value="mock_defender">MS Defender</option>
+            </select>
+            <select id="filter-severity" class="btn-ghost" style="padding: 0.4rem; font-size: 0.85rem;" 
+                    hx-get="/dashboard/alerts/table" 
+                    hx-include="[id='filter-source']"
+                    hx-target="#alerts-table-container">
+                <option value="">All Severities</option>
+                <option value="1">Info</option>
+                <option value="2">Low</option>
+                <option value="3">Medium</option>
+                <option value="4">High</option>
+                <option value="5">Critical</option>
+            </select>
+        </div>
+    </div>
+    
+    <!-- Dynamic HTMX table container that auto-refreshes every 10 seconds -->
+    <div id="alerts-table-container" 
+         hx-get="/dashboard/alerts/table" 
+         hx-trigger="every 10s"
+         hx-include="[id='filter-source'], [id='filter-severity']"
+         style="width: 100%; overflow-x: auto;">
+        {% include "alerts_table.html" %}
+    </div>
+</div>
+{% endblock %}

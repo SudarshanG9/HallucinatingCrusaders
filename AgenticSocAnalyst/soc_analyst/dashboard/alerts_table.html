@@ -1,0 +1,73 @@
+<table class="neon-table">
+    <thead>
+        <tr>
+            <th>Time</th>
+            <th>Source</th>
+            <th>Severity</th>
+            <th>Rule Description</th>
+            <th>Target User / Host / IP</th>
+            <th>Status</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% if alerts %}
+            {% for alert in alerts %}
+            <tr>
+                <td style="white-space: nowrap;">
+                    {{ alert.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
+                </td>
+                <td>
+                    <span class="neon-badge {% if 'okta' in alert.source %}neon-badge-purple{% else %}neon-badge-cyan{% endif %}">
+                        {{ alert.vendor }}
+                    </span>
+                </td>
+                <td>
+                    <span class="severity-badge sev-{{ alert.severity.value }}">
+                        {{ alert.severity.name }}
+                    </span>
+                </td>
+                <td style="font-weight: 500; color: #ffffff;">
+                    {{ alert.rule_description }}
+                </td>
+                <td>
+                    <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+                        {% if alert.username %}
+                            <span style="font-size: 0.8rem;"><i class="fa-solid fa-user text-muted mr-1"></i> {{ alert.username }}</span>
+                        {% endif %}
+                        {% if alert.hostname %}
+                            <span style="font-size: 0.8rem;"><i class="fa-solid fa-desktop text-muted mr-1"></i> {{ alert.hostname }}</span>
+                        {% endif %}
+                        {% if alert.src_ip %}
+                            <span style="font-size: 0.8rem;"><i class="fa-solid fa-network-wired text-muted mr-1"></i> {{ alert.src_ip }}</span>
+                        {% endif %}
+                    </div>
+                </td>
+                <td>
+                    <span style="font-weight: 600; text-transform: uppercase; font-size: 0.75rem; 
+                        {% if alert.investigation_status.value == 'new' %}color: var(--text-muted);
+                        {% elif alert.investigation_status.value in ['investigating', 'triaged'] %}color: var(--color-cyan); text-shadow: 0 0 5px rgba(0, 251, 251, 0.4);
+                        {% elif alert.investigation_status.value in ['escalated', 'awaiting_verdict'] %}color: var(--color-purple); text-shadow: 0 0 5px rgba(236, 177, 255, 0.4);
+                        {% elif alert.investigation_status.value == 'resolved' %}color: #34d399; text-shadow: 0 0 5px rgba(52, 211, 153, 0.4);
+                        {% else %}color: var(--text-muted);
+                        {% endif %}">
+                        {{ alert.investigation_status.value }}
+                    </span>
+                </td>
+                <td>
+                    <a href="/dashboard/investigations/{{ alert.id }}" class="btn-ghost" style="padding: 0.4rem 0.8rem; font-size: 0.75rem; font-family: var(--font-headline); display: inline-flex; align-items: center; gap: 0.3rem;">
+                        <i class="fa-solid fa-magnifying-glass-chart"></i> View
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                    <i class="fa-solid fa-circle-nodes" style="font-size: 2.5rem; margin-bottom: 1rem; display: block; color: rgba(255,255,255,0.05);"></i>
+                    No alerts currently cataloged in the Postgres store.
+                </td>
+            </tr>
+        {% endif %}
+    </tbody>
+</table>
